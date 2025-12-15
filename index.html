@@ -789,7 +789,7 @@
                 this.localData = this.loadLocal();
                 this.drive = new DriveManager(
                     (user) => this.renderAuthUI(user),
-                    (data) => this.mergeData(data)
+                    (data) => this.handleCloudData(data)
                 );
 
                 this.currentDate = new Date();
@@ -806,26 +806,84 @@
                 this.renderControls();
                 this.bindEvents();
                 this.renderDashboard();
+
+                // Auto-sync every minute
+                setInterval(() => this.sync(), 60000);
             }
 
-            // -- Data --
+            // -- Data & Sync --
             loadLocal() {
                 const raw = localStorage.getItem(DB_NAME);
                 try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
             }
 
-            save() {
-                // Save Local
-                localStorage.setItem(DB_NAME, JSON.stringify(this.localData));
-                // Save Cloud
-                this.drive.saveDriveData(this.localData);
-                this.renderDashboard();
+            async sync() {
+                if (!this.drive.isReady || !this.drive.accessToken) return;
+                console.log('Syncing...');
+                // 1. Load from Drive
+                await this.drive.loadDriveData();
+                // Note: loadDriveData calls handleCloudData internally when done
             }
 
-            mergeData(cloudData) {
-                // Merge strategy: Cloud overrides Local for simplicity, but we could do deeper merge
-                this.localData = { ...this.localData, ...cloudData };
+            handleCloudData(cloudData) {
+                // 2. Merge
+                const merged = this.smartMerge(this.localData, cloudData);
+
+                // 3. Save merged to Local
+                this.localData = merged;
                 localStorage.setItem(DB_NAME, JSON.stringify(this.localData));
+
+                // 4. Push merged back to Drive (only if different or just always to be safe)
+                this.drive.saveDriveData(this.localData);
+
+                this.renderDashboard();
+                console.log('Sync Complete');
+            }
+
+            smartMerge(local, cloud) {
+                // Deep merge with Last-Write-Wins based on updatedAt
+                const merged = { ...local };
+
+                // Iterate through years
+                for (const year in cloud) {
+                    if (!merged[year]) {
+                        merged[year] = cloud[year];
+                        continue;
+                    }
+                    // Iterate months
+                    for (const month in cloud[year]) {
+                        if (!merged[year][month]) {
+                            merged[year][month] = cloud[year][month];
+                            continue;
+                        }
+                        // Iterate days
+                        for (const day in cloud[year][month]) {
+                            const cloudDay = cloud[year][month][day];
+                            const localDay = merged[year][month][day];
+
+                            if (!localDay) {
+                                merged[year][month][day] = cloudDay;
+                            } else {
+                                // Conflict Resolution
+                                const cloudTime = cloudDay.updatedAt || 0;
+                                const localTime = localDay.updatedAt || 0;
+
+                                if (cloudTime > localTime) {
+                                    merged[year][month][day] = cloudDay;
+                                }
+                                // Else keep local
+                            }
+                        }
+                    }
+                }
+                return merged;
+            }
+
+            save() {
+                // Save Local immediately
+                localStorage.setItem(DB_NAME, JSON.stringify(this.localData));
+                // Trigger Sync to push changes and get any others
+                this.sync();
                 this.renderDashboard();
             }
 
@@ -841,7 +899,8 @@
 
                 this.localData[this.selectedYear][this.selectedMonth][d] = {
                     ...dayData,
-                    total: total
+                    total: total,
+                    updatedAt: Date.now() // Timestamp for sync
                 };
                 this.save();
             }
@@ -867,6 +926,13 @@
                     el.addEventListener('click', (e) => {
                         if (e.target.classList.contains('modal-overlay')) this.closeModal(el.id);
                     });
+                });
+
+                // Sync on visibility change (tab switch, app open)
+                document.addEventListener("visibilitychange", () => {
+                    if (document.visibilityState === 'visible') {
+                        this.sync();
+                    }
                 });
             }
 

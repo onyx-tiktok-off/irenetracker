@@ -79,6 +79,7 @@
             font-size: 1.5rem;
             font-weight: 700;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -420,6 +421,149 @@
             font-weight: 700;
             color: var(--success);
             margin-bottom: 20px;
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 640px) {
+            :root {
+                --radius-lg: 12px;
+                /* Slightly smaller radius on mobile */
+            }
+
+            .container {
+                padding: 12px;
+                max-width: 100%;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 16px;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+
+            .logo {
+                font-size: 1.75rem;
+                /* Larger logo for brand presence */
+            }
+
+            .controls {
+                flex-direction: column;
+                width: 100%;
+                gap: 12px;
+            }
+
+            .auth-status {
+                width: 100%;
+                justify-content: center;
+                background: var(--surface);
+                padding: 10px;
+                border-radius: var(--radius-sm);
+                border: 1px solid var(--border);
+            }
+
+            #monthSelect,
+            #yearSelect {
+                width: 100%;
+                padding: 12px;
+                /* Larger touch target */
+                font-size: 1rem;
+            }
+
+            /* Dashboard Stack */
+            .dashboard-card {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+                padding: 20px;
+            }
+
+            .stat-group,
+            .stat-group[style*="text-align: right"] {
+                text-align: center !important;
+                width: 100%;
+            }
+
+            /* Grid Adjustments */
+            .days-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+                gap: 8px;
+            }
+
+            .day-card {
+                min-height: 80px;
+                padding: 8px;
+            }
+
+            .day-number {
+                font-size: 1.1rem;
+            }
+
+            /* Modal Mobile Fullscreen-ish */
+            .modal {
+                width: 100%;
+                height: 100%;
+                max-height: 100%;
+                border-radius: 0;
+                display: flex;
+                flex-direction: column;
+                padding: 16px;
+            }
+
+            .modal-header {
+                margin-bottom: 16px;
+            }
+
+            .stops-list {
+                flex: 1;
+                overflow-y: auto;
+                /* Add padding for scroll */
+            }
+
+            .stop-item {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                background: var(--surface-hover);
+                padding: 12px;
+                border-radius: var(--radius-sm);
+                margin-bottom: 8px;
+                position: relative;
+            }
+
+            /* Make the remove button absolute or better placed on mobile */
+            .remove-btn {
+                grid-column: 1 / -1;
+                width: 100%;
+                height: 36px;
+                font-size: 0.875rem;
+            }
+
+            .stop-item .input-group:nth-child(2) {
+                /* KM input */
+                grid-column: 1 / -1;
+            }
+
+            /* Prevent iOS Zoom on inputs */
+            input,
+            select,
+            textarea {
+                font-size: 16px !important;
+            }
+
+            .btn {
+                min-height: 44px;
+                /* Touch target size */
+            }
+
+            .modal-footer {
+                flex-direction: column-reverse;
+                /* Primary action on top if we want, or keep standard row but full width */
+            }
+
+            .modal-footer .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>

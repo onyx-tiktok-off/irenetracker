@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Irene Tracker</title>
+    <meta name="description" content="Suivi intelligent et autonome de trajets quotidiens.">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Google Identity Services & API -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
+    <style>
+        /* --- CSS Reset & Variables --- */
+        :root {
+            --primary: #6366f1;
+            /* Indigo 500 */
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            /* Pink 500 */
+            --bg: #0f172a;
+            /* Slate 900 */
+            --surface: #1e293b;
+            /* Slate 800 */
+            --surface-hover: #334155;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --danger: #ef4444;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --font-family: 'Outfit', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Layout --- */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Auth Status */
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.875rem;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--surface-hover);
+            object-fit: cover;
+        }
+
+        select {
+            background: var(--surface);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+        }
+
+        /* --- Dashboard --- */
+        .dashboard-card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-group h3 {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .stat-group .value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .stat-group .unit {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* --- Days Grid --- */
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 12px;
+        }
+
+        .day-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+            position: relative;
+        }
+
+        .day-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            background: var(--surface-hover);
+        }
+
+        .day-card.active {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .day-number {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .day-km {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .day-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            display: none;
+        }
+
+        .day-card.has-data .day-badge {
+            display: block;
+        }
+
+        .day-card.has-data .day-km {
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        /* --- Modal --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            /* Flex when active */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal {
+            background: var(--surface);
+            width: 90%;
+            max-width: 500px;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            transform: scale(0.95);
+            transition: transform 0.3s;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .modal-overlay.open .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .close-btn:hover {
+            color: var(--text-main);
+        }
+
+        /* --- Form --- */
+        .stops-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stop-item {
+            display: grid;
+            grid-template-columns: 1fr 100px 40px;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        input {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .remove-btn {
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(220, 38, 38, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(220, 38, 38, 0.2);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .remove-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .add-stop-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border: 1px dashed var(--primary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .add-stop-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+
+        .btn-secondary {
+            background: var(--surface-hover);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+        }
+
+        .total-preview {
+            text-align: right;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <div class="logo">Irene Tracker</div>
+            <div class="controls">
+                <div id="authContainer" class="auth-status">
+                    <button class="btn btn-sm btn-primary" onclick="app.drive.login()">Connexion Google</button>
+                    <!-- Auth UI injected here -->
+                </div>
+                <select id="monthSelect"></select>
+                <select id="yearSelect"></select>
+            </div>
+        </header>
+
+        <div class="dashboard-card">
+            <div class="stat-group">
+                <h3>Total Mensuel</h3>
+                <div>
+                    <span class="value" id="monthTotal">0</span>
+                    <span class="unit">km</span>
+                </div>
+            </div>
+            <!-- Login Status Indicator -->
+            <div class="stat-group" style="text-align: right;">
+                <h3>Sauvegarde</h3>
+                <div id="syncStatusDiv">
+                    <span class="unit" style="color: var(--text-muted)">Locale</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="daysGrid" class="days-grid">
+            <!-- Days rendered here -->
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Éditer</div>
+                <button class="close-btn" onclick="app.closeModal('modalOverlay')">×</button>
+            </div>
+
+            <div class="stops-list" id="stopsList">
+                <!-- Stops injected via JS -->
+            </div>
+
+            <button class="add-stop-btn" onclick="app.addStop()">+ Ajouter une étape</button>
+
+            <div class="total-preview">
+                Total: <span id="modalTotal">0</span> km
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeModal('modalOverlay')">Annuler</button>
+                <button class="btn btn-primary" onclick="app.saveDay()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Irene Tracker - Logic Core
+         * Author: Antigravity
+         */
+
+        // --- Constants & Config ---
+        const GOOGLE_CLIENT_ID = "910313633485-js3ldfefrgtlc056i5t4go6r3b0ni0il.apps.googleusercontent.com";
+        const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.appdata openid email profile";
+        const GD_FILENAME = "irene_tracker_db.json";
+
+        const MONTHS = [
+            "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+            "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+        ];
+
+        const DB_NAME = 'irene_tracker_v1';
+
+        // --- Drive Manager ---
+        class DriveManager {
+            constructor(onAuthSuccess, onDataLoaded) {
+                this.tokenClient = null;
+                this.accessToken = null;
+                this.onAuthSuccess = onAuthSuccess;
+                this.onDataLoaded = onDataLoaded;
+                this.isReady = false;
+
+                // Initialize GIS
+                this.initGis();
+            }
+
+            initGis() {
+                // Load libraries
+                const checkGapi = setInterval(() => {
+                    if (window.google && window.gapi) {
+                        clearInterval(checkGapi);
+                        this.setupClients();
+                    }
+                }, 100);
+            }
+
+            setupClients() {
+                // 1. Token Client
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: GOOGLE_SCOPES,
+                    callback: (resp) => {
+                        if (resp.error) return console.error(resp);
+                        this.accessToken = resp.access_token;
+                        this.loadProfile();
+                        this.loadDriveData();
+                    }
+                });
+
+                // 2. GAPI Client (for Drive API calls)
+                gapi.load('client', () => {
+                    gapi.client.init({}).then(() => {
+                        // Load Drive Discovery Doc (manual load or implicit)
+                        gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+                        this.isReady = true;
+                        // auto-login check logic could go here if we stored token
+                    });
+                });
+            }
+
+            login() {
+                if (!this.isReady) return alert("Google services loading...");
+                this.tokenClient.requestAccessToken();
+            }
+
+            async loadProfile() {
+                // Quick fetch user info via OIDC compatible endpoint or just use Drive about
+                // Simpler: Just Fetch standard userinfo endpoint
+                try {
+                    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                        headers: { Authorization: `Bearer ${this.accessToken}` }
+                    });
+                    const info = await res.json();
+                    this.onAuthSuccess(info);
+                } catch (e) { console.error(e); }
+            }
+
+            // --- Drive Logic (AppData) ---
+            async loadDriveData() {
+                try {
+                    // Find file
+                    const res = await gapi.client.drive.files.list({
+                        spaces: 'appDataFolder',
+                        q: `name = '${GD_FILENAME}'`,
+                        fields: 'files(id, name)'
+                    });
+
+                    const files = res.result.files;
+                    if (files && files.length > 0) {
+                        // Download content
+                        const fileId = files[0].id;
+                        const contentRes = await gapi.client.drive.files.get({
+                            fileId: fileId,
+                            alt: 'media'
+                        });
+                        this.fileId = fileId; // Remember for updates
+                        this.onDataLoaded(contentRes.result); // result is the JSON object
+                        document.getElementById('syncStatusDiv').innerHTML = '<span class="unit" style="color: var(--success)">Sync Drive OK</span>';
+                    } else {
+                        console.log("No remote file found, will create one on first save.");
+                        this.fileId = null;
+                    }
+                } catch (e) {
+                    console.error("Drive Load Error", e);
+                    document.getElementById('syncStatusDiv').innerHTML = '<span class="unit" style="color: var(--danger)">Erreur Sync</span>';
+                }
+            }
+
+            async saveDriveData(data) {
+                if (!this.accessToken || !this.isReady) return; // Silent if no auth
+
+                const fileContent = JSON.stringify(data);
+                const metadata = {
+                    name: GD_FILENAME,
+                    mimeType: 'application/json',
+                    parents: ['appDataFolder']
+                };
+
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', new Blob([fileContent], { type: 'application/json' }));
+
+                try {
+                    let method = 'POST';
+                    let path = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+
+                    if (this.fileId) {
+                        method = 'PATCH';
+                        path = `https://www.googleapis.com/upload/drive/v3/files/${this.fileId}?uploadType=multipart`;
+                    }
+
+                    const res = await fetch(path, {
+                        method: method,
+                        headers: { Authorization: `Bearer ${this.accessToken}` },
+                        body: form
+                    });
+
+                    if (res.ok) {
+                        const json = await res.json();
+                        this.fileId = json.id;
+                        document.getElementById('syncStatusDiv').innerHTML = '<span class="unit" style="color: var(--success)">Sauvegardé (Drive)</span>';
+                    }
+                } catch (e) {
+                    console.error("Save Error", e);
+                }
+            }
+        }
+
+        // --- App Logic ---
+        class App {
+            constructor() {
+                this.localData = this.loadLocal();
+                this.drive = new DriveManager(
+                    (user) => this.renderAuthUI(user),
+                    (data) => this.mergeData(data)
+                );
+
+                this.currentDate = new Date();
+                this.selectedYear = this.currentDate.getFullYear();
+                this.selectedMonth = this.currentDate.getMonth();
+
+                this.editingDay = null; // number
+                this.currentStops = [];
+
+                this.init();
+            }
+
+            init() {
+                this.renderControls();
+                this.bindEvents();
+                this.renderDashboard();
+            }
+
+            // -- Data --
+            loadLocal() {
+                const raw = localStorage.getItem(DB_NAME);
+                try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+            }
+
+            save() {
+                // Save Local
+                localStorage.setItem(DB_NAME, JSON.stringify(this.localData));
+                // Save Cloud
+                this.drive.saveDriveData(this.localData);
+                this.renderDashboard();
+            }
+
+            mergeData(cloudData) {
+                // Merge strategy: Cloud overrides Local for simplicity, but we could do deeper merge
+                this.localData = { ...this.localData, ...cloudData };
+                localStorage.setItem(DB_NAME, JSON.stringify(this.localData));
+                this.renderDashboard();
+            }
+
+            getDay(d) {
+                return this.localData[this.selectedYear]?.[this.selectedMonth]?.[d];
+            }
+
+            setDay(d, dayData) {
+                if (!this.localData[this.selectedYear]) this.localData[this.selectedYear] = {};
+                if (!this.localData[this.selectedYear][this.selectedMonth]) this.localData[this.selectedYear][this.selectedMonth] = {};
+
+                const total = dayData.stops.reduce((sum, stop) => sum + (parseFloat(stop.km) || 0), 0);
+
+                this.localData[this.selectedYear][this.selectedMonth][d] = {
+                    ...dayData,
+                    total: total
+                };
+                this.save();
+            }
+
+            getMonthTotal() {
+                const monthData = this.localData[this.selectedYear]?.[this.selectedMonth];
+                if (!monthData) return 0;
+                return Object.values(monthData).reduce((sum, day) => sum + (day.total || 0), 0);
+            }
+
+            // -- UI --
+            bindEvents() {
+                document.getElementById('monthSelect').addEventListener('change', (e) => {
+                    this.selectedMonth = parseInt(e.target.value);
+                    this.renderDashboard();
+                });
+                document.getElementById('yearSelect').addEventListener('change', (e) => {
+                    this.selectedYear = parseInt(e.target.value);
+                    this.renderDashboard();
+                });
+
+                document.querySelectorAll('.modal-overlay').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('modal-overlay')) this.closeModal(el.id);
+                    });
+                });
+            }
+
+            renderControls() {
+                const mSelect = document.getElementById('monthSelect');
+                const ySelect = document.getElementById('yearSelect');
+
+                mSelect.innerHTML = MONTHS.map((m, i) =>
+                    `<option value="${i}" ${i === this.selectedMonth ? 'selected' : ''}>${m}</option>`
+                ).join('');
+
+                const currentYear = new Date().getFullYear();
+                let yearsHtml = '';
+                for (let y = currentYear - 2; y <= currentYear + 5; y++) {
+                    yearsHtml += `<option value="${y}" ${y === this.selectedYear ? 'selected' : ''}>${y}</option>`;
+                }
+                ySelect.innerHTML = yearsHtml;
+            }
+
+            renderAuthUI(user) {
+                const container = document.getElementById('authContainer');
+                if (user) {
+                    container.innerHTML = `
+                <img src="${user.picture || ''}" class="user-avatar" title="${user.name}">
+                <div style="font-size:0.8rem">${user.given_name}</div>
+            `;
+                }
+            }
+
+            renderDashboard() {
+                const total = this.getMonthTotal();
+                document.getElementById('monthTotal').innerText = total.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+
+                const grid = document.getElementById('daysGrid');
+                grid.innerHTML = '';
+
+                const daysInMonth = new Date(this.selectedYear, this.selectedMonth + 1, 0).getDate();
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const data = this.getDay(d);
+                    const hasData = !!data;
+
+                    const card = document.createElement('div');
+                    card.className = `day-card ${hasData ? 'has-data' : ''}`;
+                    card.onclick = () => this.openDay(d);
+
+                    card.innerHTML = `
+                <div class="day-number">${d}</div>
+                <div class="day-badge"></div>
+                <div class="day-km">${hasData ? data.total + ' km' : '-'}</div>
+            `;
+                    grid.appendChild(card);
+                }
+            }
+
+            // -- Modals --
+            closeModal(id) {
+                document.getElementById(id).classList.remove('open');
+                this.editingDay = null;
+            }
+
+            openDay(day) {
+                this.editingDay = day;
+                document.getElementById('modalTitle').innerText = `${day} ${MONTHS[this.selectedMonth]} ${this.selectedYear}`;
+
+                const data = this.getDay(day);
+
+                if (data) {
+                    this.currentStops = JSON.parse(JSON.stringify(data.stops));
+                } else {
+                    this.currentStops = [
+                        { type: 'start', label: 'Domicile -> Premier Client', name: '', km: 0 },
+                        { type: 'end', label: 'Dernier Client -> Domicile', name: 'Retour Domicile', km: 0 }
+                    ];
+                }
+
+                this.renderStops();
+                this.updateModalTotal();
+                document.getElementById('modalOverlay').classList.add('open');
+            }
+
+            // -- Stop Editing --
+            addStop() {
+                const newStop = { type: 'stop', label: 'Client / Étape', name: '', km: 0 };
+                if (this.currentStops.length > 0) {
+                    this.currentStops.splice(this.currentStops.length - 1, 0, newStop);
+                } else {
+                    this.currentStops.push(newStop);
+                }
+                this.renderStops();
+            }
+
+            removeStop(index) {
+                this.currentStops.splice(index, 1);
+                this.renderStops();
+                this.updateModalTotal();
+            }
+
+            updateStop(index, field, value) {
+                this.currentStops[index][field] = value;
+                if (field === 'km') this.updateModalTotal();
+            }
+
+            updateModalTotal() {
+                const total = this.currentStops.reduce((sum, stop) => sum + (parseFloat(stop.km) || 0), 0);
+                document.getElementById('modalTotal').innerText = total;
+            }
+
+            renderStops() {
+                const container = document.getElementById('stopsList');
+                container.innerHTML = '';
+
+                this.currentStops.forEach((stop, index) => {
+                    const isLast = index === this.currentStops.length - 1;
+                    const isFirst = index === 0;
+
+                    const div = document.createElement('div');
+                    div.className = 'stop-item';
+
+                    let placeholder = 'Nom du client';
+                    if (isFirst) placeholder = 'Premier Client';
+                    if (isLast) placeholder = 'Retour Domicile';
+
+                    div.innerHTML = `
+                <div class="input-group">
+                    <label>${stop.label || 'Trajet'}</label>
+                    <input type="text" placeholder="${placeholder}" value="${stop.name}" 
+                        oninput="app.updateStop(${index}, 'name', this.value)">
+                </div>
+                <div class="input-group">
+                    <label>Km</label>
+                    <input type="number" step="0.1" placeholder="0" value="${stop.km}" 
+                        oninput="app.updateStop(${index}, 'km', this.value)">
+                </div>
+            `;
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'remove-btn';
+                    delBtn.innerHTML = '×';
+                    delBtn.tabIndex = -1;
+                    delBtn.onclick = () => this.removeStop(index);
+
+                    div.appendChild(delBtn);
+                    container.appendChild(div);
+                });
+            }
+
+            saveDay() {
+                if (this.editingDay === null) return;
+                this.setDay(this.editingDay, { stops: this.currentStops });
+                this.closeModal('modalOverlay');
+            }
+        }
+
+        const app = new App();
+    </script>
+</body>
+
+</html>

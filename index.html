@@ -678,9 +678,7 @@
                     scope: GOOGLE_SCOPES,
                     callback: (resp) => {
                         if (resp.error) return console.error(resp);
-                        this.accessToken = resp.access_token;
-                        this.loadProfile();
-                        this.loadDriveData();
+                        this.handleTokenResponse(resp);
                     }
                 });
 
@@ -688,16 +686,62 @@
                 gapi.load('client', () => {
                     gapi.client.init({}).then(() => {
                         // Load Drive Discovery Doc (manual load or implicit)
-                        gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-                        this.isReady = true;
-                        // auto-login check logic could go here if we stored token
+                        gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest')
+                            .then(() => {
+                                this.isReady = true;
+                                this.tryRestoreSession();
+                            });
                     });
                 });
             }
 
+            handleTokenResponse(resp) {
+                this.accessToken = resp.access_token;
+
+                // Calculate expiry (expires_in is in seconds)
+                const expiresIn = resp.expires_in;
+                const expiresAt = Date.now() + (expiresIn * 1000);
+
+                localStorage.setItem('google_access_token', this.accessToken);
+                localStorage.setItem('google_token_expiry', expiresAt);
+
+                this.loadProfile();
+                this.loadDriveData();
+            }
+
+            tryRestoreSession() {
+                const token = localStorage.getItem('google_access_token');
+                const expiry = localStorage.getItem('google_token_expiry');
+
+                if (token && expiry) {
+                    if (Date.now() < parseInt(expiry)) {
+                        console.log("Restoring Session...");
+                        this.accessToken = token;
+                        // Set standard gapi token
+                        gapi.client.setToken({ access_token: token });
+
+                        this.loadProfile();
+                        this.loadDriveData();
+                    } else {
+                        console.log("Session Expired");
+                        this.logout();
+                    }
+                }
+            }
+
             login() {
                 if (!this.isReady) return alert("Google services loading...");
+                // Provide hint if we have it? No, standard flow is fine.
                 this.tokenClient.requestAccessToken();
+            }
+
+            logout() {
+                this.accessToken = null;
+                localStorage.removeItem('google_access_token');
+                localStorage.removeItem('google_token_expiry');
+                // Optional: clear auth UI
+                // Reuse onAuthSuccess with null to clear
+                // this.onAuthSuccess(null); 
             }
 
             async loadProfile() {
@@ -707,9 +751,14 @@
                     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                         headers: { Authorization: `Bearer ${this.accessToken}` }
                     });
+                    if (!res.ok) throw new Error('Token likely invalid');
                     const info = await res.json();
                     this.onAuthSuccess(info);
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error("Profile Load Error", e);
+                    // If profile fails, token is probably bad despite expiry check
+                    this.logout();
+                }
             }
 
             // --- Drive Logic (AppData) ---

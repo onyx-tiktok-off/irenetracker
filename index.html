@@ -423,6 +423,41 @@
             margin-bottom: 20px;
         }
 
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--success);
+            animation: spin 1s linear infinite;
+        }
+
+        .sync-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .sync-btn:hover {
+            color: var(--text-main);
+            border-color: var(--primary);
+        }
+
         /* --- Mobile Responsiveness --- */
         @media (max-width: 640px) {
             :root {
@@ -855,9 +890,10 @@
                 this.renderControls();
                 this.bindEvents();
                 this.renderDashboard();
+                this.updateSyncUI('idle');
 
-                // Auto-sync every minute
-                setInterval(() => this.sync(), 60000);
+                // Auto-sync every 30 seconds
+                setInterval(() => this.sync(), 30000);
             }
 
             // -- Data & Sync --
@@ -867,11 +903,35 @@
             }
 
             async sync() {
-                if (!this.drive.isReady || !this.drive.accessToken) return;
+                if (!this.drive.isReady || !this.drive.accessToken) {
+                    this.updateSyncUI('offline');
+                    return;
+                }
+
+                this.updateSyncUI('syncing');
                 console.log('Syncing...');
+
                 // 1. Load from Drive
                 await this.drive.loadDriveData();
                 // Note: loadDriveData calls handleCloudData internally when done
+            }
+
+            updateSyncUI(state) {
+                const container = document.getElementById('syncStatusDiv');
+                if (!container) return;
+
+                if (state === 'syncing') {
+                    container.innerHTML = `<button class="sync-btn"><span class="spinner"></span> Sync...</button>`;
+                } else if (state === 'success') {
+                    container.innerHTML = `<button class="sync-btn" onclick="app.sync()" style="border-color: var(--success); color: var(--success)">✓ À jour</button>`;
+                    // Revert to normal after 3s
+                    setTimeout(() => this.updateSyncUI('idle'), 3000);
+                } else if (state === 'offline') {
+                    container.innerHTML = `<span class="unit" style="color: var(--text-muted)">Non connecté</span>`;
+                } else {
+                    // Idle
+                    container.innerHTML = `<button class="sync-btn" onclick="app.sync()">⟳ Sync</button>`;
+                }
             }
 
             handleCloudData(cloudData) {
@@ -886,6 +946,7 @@
                 this.drive.saveDriveData(this.localData);
 
                 this.renderDashboard();
+                this.updateSyncUI('success');
                 console.log('Sync Complete');
             }
 
